@@ -1,0 +1,45 @@
+---
+title: "0-NMR"
+author: "Alexis Sciau"
+date: "11/03/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## NMR data prep
+
+Some very small data prep is needed in order to have data in the same fashion as churn data
+
+```{r data_discovery}
+nmr_training_data <- vroom::vroom("numerai_datasets/254/numerai_training_data.csv")
+nmr_training_data %>% 
+  count(data_type)
+
+nmr_tournament_data <- vroom::vroom("numerai_datasets/254/numerai_tournament_data.csv")
+nmr_tournament_data %>%
+  count(data_type)
+nmr_tournament_data %>%
+  filter(data_type == "validation") %>%
+  select(id, era, data_type, feature_intelligence1, feature_intelligence2, target)
+nmr_tournament_data %>%
+  filter(data_type == "test") %>%
+  select(id, era, data_type, feature_intelligence1, feature_intelligence2, target) 
+nmr_tournament_data %>%
+  filter(data_type == "live") %>%
+  select(id, era, data_type, feature_intelligence1, feature_intelligence2, target) 
+```
+
+We should prepare the data so that it looks more like the data used in the tuto.
+
+```{r data_prep}
+nmr_data <- nmr_training_data %>%
+  bind_rows(nmr_tournament_data %>% filter(data_type == "validation")) 
+nmr_data %>%
+  count(data_type) %>%
+  mutate(prop = n/sum(n))
+
+vroom::vroom_write(nmr_data %>% select(-data_type), "numerai_datasets/254/nmr_data")
+```
