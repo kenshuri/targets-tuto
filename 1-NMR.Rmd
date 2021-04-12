@@ -3,6 +3,8 @@ title: "1-NMR"
 author: "Alexis Sciau"
 date: "11/03/2021"
 output: html_document
+params:
+  nmr_round: 254
 ---
 
 ```{r setup, message=FALSE}
@@ -32,6 +34,9 @@ library(tensorflow)
 
 library(tidyverse)
 library(vroom)
+
+nmr_round <- params$nmr_round
+nmr_training_metadata <- vroom(paste0("numerai_datasets/", nmr_round, "/nmr_training_metadata"))
 ```
 
 ## Introduction
@@ -44,17 +49,17 @@ For machine learning, we need to split the financial assets (rows) into a traini
 ```{r}
 split_data <- function(vroom_file) {
   vroom::vroom(vroom_file, col_select = c(-data_type, -era)) %>%
-    initial_split(prop = 0.7) # from the rsample package
+    initial_time_split(prop = nmr_training_metadata %>% filter(data_type == "train") %>% pull(prop)) # from the rsample package
 }
 ```
 
 Try out the function.
 
 ```{r}
-nmr_data <- split_data("numerai_datasets/254/nmr_data")
+nmr_data <- split_data(paste0("numerai_datasets/", nmr_round, "/nmr_data"))
 ```
 
-The training set has 447711 financial assets (rows) and the testing set has 191876
+The training set has 501808 financial assets (rows) and the testing set has 137779
 
 ```{r}
 print(nmr_data)
@@ -62,27 +67,20 @@ print(nmr_data)
 
 Functions from [`rsample`](https://tidymodels.github.io/rsample) can recover the training and testing sets.
 
-```{r}
-training(nmr_data)
-```
+The dataset has 312 variables (columns).
 
 ```{r}
-testing(nmr_data)
-```
-
-The dataset has 314 variables (columns).
-
-```{r}
-# View(training(churn_data))
 glimpse(training(nmr_data))
+```
+```{r}
+glimpse(testing(nmr_data))
 ```
 
 `target` is our response variable, and `id` identifies the financial asset.
 
 ```{r}
 training(nmr_data) %>%
-  select(id, target) %>%
-  print()
+  select(id, target)
 ```
 
 The rest of the variables are covariates: the features describe the various quantitative attributes of the stock at the time
@@ -131,7 +129,7 @@ juice(nmr_recipe, all_predictors(), composition = "matrix")[1:6, 1:4]
 When we compute accuracy later on, we will use `bake()` to preprocess the testing data.
 
 ```{r}
-bake(churn_recipe, testing(churn_data))
+bake(nmr_recipe, testing(nmr_data))
 ```
 
 # `define_model()`
@@ -179,26 +177,26 @@ Next, we need to fit a model and return the fitted model object.
 
 ```{r}
 train_model <- function(
-  churn_recipe,
+  nmr_recipe,
   units1 = 16,
   units2 = 16,
   act1 = "relu",
   act2 = "relu",
   act3 = "sigmoid"
 ) {
-  model <- define_model(churn_recipe, units1, units2, act1, act2, act3)
+  model <- define_model(nmr_recipe, units1, units2, act1, act2, act3)
   compile(
     model,
     optimizer = "adam",
-    loss = "binary_crossentropy",
+    loss = "categorical_crossentropy",
     metrics = c("accuracy")
   )
   x_train_tbl <- juice(
-    churn_recipe,
+    nmr_recipe,
     all_predictors(),
     composition = "matrix"
   )
-  y_train_vec <- juice(churn_recipe, all_outcomes()) %>%
+  y_train_vec <- juice(nmr_recipe, all_outcomes()) %>%
     pull()
   fit(
     object = model,
@@ -206,7 +204,7 @@ train_model <- function(
     y = y_train_vec,
     batch_size = 32,
     epochs = 32,
-    validation_split = 0.3,
+    validation_split = nmr_training_metadata %>% filter(data_type == "train") %>% pull(prop),
     verbose = 0
   )
   model

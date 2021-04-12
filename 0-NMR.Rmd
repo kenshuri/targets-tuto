@@ -3,10 +3,13 @@ title: "0-NMR"
 author: "Alexis Sciau"
 date: "11/03/2021"
 output: html_document
+params:
+  nmr_round: 254
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+nmr_round <- params$nmr_round
 ```
 
 ## NMR data prep
@@ -14,11 +17,11 @@ knitr::opts_chunk$set(echo = TRUE)
 Some very small data prep is needed in order to have data in the same fashion as churn data
 
 ```{r data_discovery}
-nmr_training_data <- vroom::vroom("numerai_datasets/254/numerai_training_data.csv")
+nmr_training_data <- vroom::vroom(paste0("numerai_datasets/", nmr_round, "/numerai_training_data.csv"))
 nmr_training_data %>% 
   count(data_type)
 
-nmr_tournament_data <- vroom::vroom("numerai_datasets/254/numerai_tournament_data.csv")
+nmr_tournament_data <- vroom::vroom(paste0("numerai_datasets/", nmr_round, "/numerai_tournament_data.csv"))
 nmr_tournament_data %>%
   count(data_type)
 nmr_tournament_data %>%
@@ -41,5 +44,9 @@ nmr_data %>%
   count(data_type) %>%
   mutate(prop = n/sum(n))
 
+vroom::vroom_write(nmr_data %>% 
+                     count(data_type) %>% 
+                     mutate(prop = n/sum(n)),
+                   paste0("numerai_datasets/", nmr_round, "/nmr_training_metadata"))
 vroom::vroom_write(nmr_data %>% select(-data_type), "numerai_datasets/254/nmr_data")
 ```
